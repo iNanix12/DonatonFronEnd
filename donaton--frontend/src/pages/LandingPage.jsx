@@ -1,4 +1,3 @@
-import { AuthProvider } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import Hero from '../components/Hero'
 import QuienesSomos from '../components/QuienesSomos'
@@ -7,7 +6,7 @@ import Footer from '../components/Footer'
 
 export default function LandingPage() {
   return (
-    <AuthProvider>
+    <>
       <Navbar />
       <main>
         <Hero />
@@ -15,6 +14,6 @@ export default function LandingPage() {
         <Noticias />
       </main>
       <Footer />
-    </AuthProvider>
+    </>
   )
 }
