@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import AuthModal from './AuthModal'
+import { useNavigate } from 'react-router-dom'
 
 export default function Navbar() {
   const { user, logout, isAdmin } = useAuth()
   const [modal, setModal]           = useState(null)
   const [dropdownOpen, setDropdown] = useState(false)
+  const navigate = useNavigate()
 
   // Escucha eventos del Hero u otros componentes que quieran abrir el modal
   useEffect(() => {
@@ -87,18 +89,26 @@ export default function Navbar() {
                   boxShadow: '0 16px 40px rgba(0,0,0,.5)',
                 }}>
                   {[
-                    ['👤', 'Mi perfil'],
-                    ['📋', 'Mis donaciones'],
-                    ...(isAdmin ? [['⚙️', 'Panel admin']] : []),
-                  ].map(([icon, label]) => (
-                    <button key={label} style={{
-                      width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '10px 12px', background: 'none', border: 'none',
-                      borderRadius: 8, color: 'var(--text)', fontSize: '.875rem', cursor: 'pointer',
-                    }}
+                    ['👤', 'Mi perfil', () => navigate('/perfil')],
+                    ['📋', 'Mis donaciones', () => navigate('/mis-donaciones')],
+                    ...(isAdmin ? [['⚙️', 'Panel admin', () => navigate('/admin')]] : []),
+                  ].map(([icon, label, action]) => ( // Añadimos 'action' aquí
+                    <button 
+                      key={label} 
+                      onClick={() => {
+                        if (action) action(); // Ejecuta la navegación si existe
+                        setDropdown(false);   // Cierra el menú siempre
+                      }}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '10px 12px', background: 'none', border: 'none',
+                        borderRadius: 8, color: 'var(--text)', fontSize: '.875rem', cursor: 'pointer',
+                      }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                    ><span>{icon}</span>{label}</button>
+                    >
+                      <span>{icon}</span>{label}
+                    </button>
                   ))}
                   <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
                   <button onClick={() => { logout(); setDropdown(false) }} style={{
