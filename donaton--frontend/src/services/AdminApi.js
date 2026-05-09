@@ -1,5 +1,6 @@
 const BASE_URL = 'http://localhost:9090'
 
+
 function authHeaders() {
   const token = localStorage.getItem('token')
   return {
@@ -24,6 +25,16 @@ async function req(path, options = {}) {
 export const adminDonaciones = {
   listarGlobal:    (page = 0, size = 20) => req(`/api/donaciones/admin?page=${page}&size=${size}`),
   historialPorRut: (rut, page = 0)       => req(`/api/donaciones/historial/paginado?rut=${rut}&page=${page}&size=10`),
+  registrar:       (body)                => req('/api/donaciones', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Donantes
+  listarDonantes:   ()          => req('/api/donaciones/donantes'),
+  obtenerDonante:   (rut)       => req(`/api/donaciones/donantes/rut/${rut}`),
+  actualizarDonante:(id, body)  => req(`/api/donaciones/donantes/${id}`, { method: 'PUT',    body: JSON.stringify(body) }),
+  eliminarDonante:  (id)        => req(`/api/donaciones/donantes/${id}`, { method: 'DELETE' }),
+
+  // Recursos
+  eliminarRecurso:  (id)        => req(`/api/donaciones/recursos/${id}`, { method: 'DELETE' }),
 }
 
 export const adminLogistica = {
@@ -39,6 +50,10 @@ export const adminLogistica = {
   confirmarEntrega:    (id, observaciones) => req(`/api/logistica/envios/${id}/entregar`, { method: 'PATCH', body: JSON.stringify({ observaciones }) }),
   cancelar:            (id, motivo)   => req(`/api/logistica/envios/${id}/cancelar`, { method: 'PATCH', body: JSON.stringify({ motivo }) }),
   rastrear:            (numero)       => req(`/api/logistica/seguimiento/${numero}`),
+  // Agrega estas 3 líneas dentro del objeto adminLogistica
+  actualizarCentro: (id, body) => req(`/api/logistica/centros/${id}`,               { method: 'PUT',    body: JSON.stringify(body) }),
+  toggleEstado:     (id)       => req(`/api/logistica/centros/${id}/toggle-estado`,  { method: 'PATCH' }),
+  eliminarCentro:   (id)       => req(`/api/logistica/centros/${id}`,               { method: 'DELETE' }),
 }
 
 export const adminNecesidades = {
@@ -70,3 +85,5 @@ export const adminUsuarios = {
   toggleActivo:    (id)       => req(`/auth/usuarios/${id}/toggle-activo`, { method: 'PATCH' }),
   eliminar:        (id)       => req(`/auth/usuarios/${id}`, { method: 'DELETE' }),
 }
+
+
