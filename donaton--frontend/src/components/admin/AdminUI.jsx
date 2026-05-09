@@ -101,24 +101,40 @@ export function Input({ label, value, onChange, type = 'text', placeholder = '',
   )
 }
 
-export function Select({ label, value, onChange, options = [], required = false }) {
+
+
+export function Select({ label, value, onChange, options = [], required = false, disabled = false }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <label style={{ display: 'block', fontSize: '.78rem', color: 'var(--muted)', marginBottom: 5, letterSpacing: '.05em', textTransform: 'uppercase' }}>
-        {label}{required && <span style={{ color: 'var(--accent)', marginLeft: 3 }}>*</span>}
+      <label style={{
+        display: 'block', fontSize: '.78rem',
+        color: disabled ? 'rgba(136,136,152,.5)' : 'var(--muted)',
+        marginBottom: 5, letterSpacing: '.05em', textTransform: 'uppercase',
+      }}>
+        {label}{required && !disabled && <span style={{ color: 'var(--accent)', marginLeft: 3 }}>*</span>}
       </label>
-      <select value={value} onChange={e => onChange(e.target.value)} required={required}
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        required={required && !disabled}
+        disabled={disabled}
         style={{
-          width: '100%', background: 'var(--bg)', border: '1px solid var(--border)',
-          borderRadius: 8, padding: '9px 12px', color: 'var(--text)',
-          fontFamily: 'var(--font-body)', fontSize: '.875rem', outline: 'none', cursor: 'pointer',
+          width: '100%', background: disabled ? 'rgba(26,26,38,.5)' : 'var(--bg)',
+          border: '1px solid var(--border)', borderRadius: 8,
+          padding: '9px 12px', color: disabled ? 'var(--muted)' : 'var(--text)',
+          fontFamily: 'var(--font-body)', fontSize: '.875rem',
+          outline: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? .6 : 1,
         }}
-        onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+        onFocus={e => { if (!disabled) e.target.style.borderColor = 'var(--accent)' }}
         onBlur={e => e.target.style.borderColor = 'var(--border)'}
       >
-        {options.map(({ value: v, label: l }) => (
-          <option key={v} value={v} style={{ background: 'var(--surface)' }}>{l}</option>
-        ))}
+        {disabled
+          ? <option value="">— selecciona una región primero —</option>
+          : options.map(({ value: v, label: l }) => (
+            <option key={v} value={v} style={{ background: 'var(--surface)' }}>{l}</option>
+          ))
+        }
       </select>
     </div>
   )
