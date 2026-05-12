@@ -1,8 +1,15 @@
 const BASE_URL = 'http://localhost:9090'
 
+function getToken() {
+  // Intenta localStorage primero, luego sessionStorage como fallback
+  return localStorage.getItem('token') || sessionStorage.getItem('token') || null
+}
 
 function authHeaders() {
-  const token = localStorage.getItem('token')
+  const token = getToken()
+  if (!token) {
+    console.warn('[adminApi] No hay token en localStorage — request sin Authorization')
+  }
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -10,15 +17,30 @@ function authHeaders() {
 }
 
 async function req(path, options = {}) {
+  const headers = { ...authHeaders(), ...(options.headers || {}) }
+
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
-    headers: { ...authHeaders(), ...(options.headers || {}) },
+    headers,
   })
+
   if (!res.ok) {
+    // Intenta parsear el error como JSON, si no usa el statusText
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw { status: res.status, message: err.error || err.mensaje || `Error ${res.status}` }
   }
+
+  // 204 No Content o respuesta sin body (Content-Length: 0)
   if (res.status === 204) return null
+  
+  const contentLength = res.headers.get('content-length')
+  const contentType   = res.headers.get('content-type')
+  
+  // Si no hay body o no es JSON, retornar null sin intentar parsear
+  if (contentLength === '0' || !contentType?.includes('application/json')) {
+    return null
+  }
+
   return res.json()
 }
 
@@ -54,26 +76,47 @@ export const adminLogistica = {
   actualizarCentro: (id, body) => req(`/api/logistica/centros/${id}`,               { method: 'PUT',    body: JSON.stringify(body) }),
   toggleEstado:     (id)       => req(`/api/logistica/centros/${id}/toggle-estado`,  { method: 'PATCH' }),
   eliminarCentro:   (id)       => req(`/api/logistica/centros/${id}`,               { method: 'DELETE' }),
+  // Distribucion de Inventario a los centros de acopio
+  distribuirAlInventario: (centroId, tipoRecurso, cantidad, unidadMedida) => {
+  // NO usar encodeURIComponent en tipoRecurso — el backend espera el string exacto
+  const params = new URLSearchParams({
+    tipoRecurso:  tipoRecurso,
+    cantidad:     String(cantidad),
+    unidadMedida: unidadMedida,
+  })
+  return req(`/api/logistica/inventario/recibir/${centroId}?${params.toString()}`, { method: 'POST' })},
 }
 
 export const adminNecesidades = {
   resumen:              ()              => req('/api/necesidades/admin/resumen'),
-  listarZonas:          ()              => req('/api/necesidades/zonas'),
+
+  // Zonas
+  listarZonas:          ()              => req('/api/necesidades/zonas/todas'),
+  listarZonasActivas:   ()              => req('/api/necesidades/zonas'),
   listarZonasPorRegion: (region)        => req(`/api/necesidades/zonas/region/${region}`),
   obtenerZona:          (id)            => req(`/api/necesidades/zonas/${id}`),
-  crearZona:            (body)          => req('/api/necesidades/zonas', { method: 'POST', body: JSON.stringify(body) }),
+  crearZona:            (body)          => req('/api/necesidades/zonas',   { method: 'POST',   body: JSON.stringify(body) }),
+  actualizarZona:       (id, body)      => req(`/api/necesidades/zonas/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  eliminarZona:         (id)            => req(`/api/necesidades/zonas/${id}`, { method: 'DELETE' }),
   cerrarZona:           (id)            => req(`/api/necesidades/zonas/${id}/cerrar`, { method: 'PATCH' }),
+
+  // Reportes
   listarUrgentes:       ()              => req('/api/necesidades/reportes/urgentes'),
   listarReportes:       (page = 0, size = 20) => req(`/api/necesidades/reportes?page=${page}&size=${size}`),
   listarReportesPorZona:(zonaId)        => req(`/api/necesidades/reportes/zona/${zonaId}`),
   obtenerReporte:       (id)            => req(`/api/necesidades/reportes/${id}`),
-  crearReporte:         (body)          => req('/api/necesidades/reportes', { method: 'POST', body: JSON.stringify(body) }),
+  crearReporte:         (body)          => req('/api/necesidades/reportes',    { method: 'POST',   body: JSON.stringify(body) }),
+  actualizarReporte:    (id, body)      => req(`/api/necesidades/reportes/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  eliminarReporte:      (id)            => req(`/api/necesidades/reportes/${id}`, { method: 'DELETE' }),
   actualizarEstado:     (id, nuevoEstado, observaciones = '') =>
     req(`/api/necesidades/reportes/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ nuevoEstado, observaciones }) }),
+
+  // Asignaciones
   listarAsignaciones:   (reporteId)     => req(`/api/necesidades/asignaciones/reporte/${reporteId}`),
   crearAsignacion:      (body)          => req('/api/necesidades/asignaciones', { method: 'POST', body: JSON.stringify(body) }),
   confirmarAsignacion:  (id)            => req(`/api/necesidades/asignaciones/${id}/confirmar`, { method: 'PATCH' }),
   cancelarAsignacion:   (id, motivo)    => req(`/api/necesidades/asignaciones/${id}/cancelar?motivo=${encodeURIComponent(motivo)}`, { method: 'PATCH' }),
+  eliminarAsignacion:   (id)            => req(`/api/necesidades/asignaciones/${id}`, { method: 'DELETE' }),
 }
 
 
