@@ -244,6 +244,197 @@ function ModalNuevaDonacion({ centros, onClose, onCreado }) {
   )
 }
 
+// ── Modal distribuir donación a centro ───────────────────────────────────────
+function ModalDistribuir({ recurso, centros, onClose, onDistribuido }) {
+  const [centroId,  setCentroId]  = useState(centros[0]?.id ? String(centros[0].id) : '')
+  const [cantidad,  setCantidad]  = useState('')
+  const [loading,   setLoading]   = useState(false)
+  const [error,     setError]     = useState('')
+  const [ok,        setOk]        = useState(false)
+
+  const opcionCentros  = centros.map(c => ({ value: String(c.id), label: `${c.nombre} (${c.comuna})` }))
+  const cantidadNum    = parseFloat(cantidad) || 0
+  const totalDisponible = parseFloat(recurso.cantidad) || 0
+  const pct            = totalDisponible > 0 ? Math.min(100, (cantidadNum / totalDisponible) * 100) : 0
+  const excede         = cantidadNum > totalDisponible
+  const EMOJI          = { ALIMENTOS: '🍚', ROPA: '👕', DINERO: '💰', INSUMOS_MEDICOS: '💊', INSUMOS_HIGIENE: '🧼', OTRO: '📦' }
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (cantidadNum <= 0)     { setError('Ingresa una cantidad mayor a 0'); return }
+    if (excede)               { setError(`No puedes distribuir más de ${totalDisponible} ${recurso.unidadMedida}`); return }
+    if (!centroId)            { setError('Selecciona un centro de acopio'); return }
+    setLoading(true); setError('')
+    try {
+      await adminLogistica.distribuirAlInventario(
+        parseInt(centroId),
+        recurso.tipoRecurso,
+        cantidadNum,
+        recurso.unidadMedida,
+      )
+      setOk(true)
+      onDistribuido()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal title="Distribuir donación a centro" onClose={onClose} width={460}>
+      {ok ? (
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>✅</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 700, marginBottom: 8 }}>
+            Distribución exitosa
+          </div>
+          <div style={{ color: 'var(--muted)', fontSize: '.875rem' }}>
+            Se agregaron <strong style={{ color: 'var(--text)' }}>{cantidadNum} {recurso.unidadMedida}</strong> al inventario del centro.
+          </div>
+          <Btn variant="ghost" onClick={onClose} style={{ marginTop: 20 }}>Cerrar</Btn>
+        </div>
+      ) : (
+        <>
+          {/* Resumen del recurso */}
+          <div style={{
+            background: 'var(--surface2)', borderRadius: 12, padding: '16px 20px',
+            marginBottom: 24, display: 'flex', alignItems: 'center', gap: 16,
+          }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: 12, flexShrink: 0,
+              background: 'rgba(232,52,90,.12)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem',
+            }}>
+              {EMOJI[recurso.tipoRecurso] || '📦'}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>{recurso.tipoRecurso}</div>
+              <div style={{ color: 'var(--muted)', fontSize: '.82rem', marginBottom: 4 }}>{recurso.descripcion}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>Total disponible:</span>
+                <span style={{
+                  fontFamily: 'var(--font-display)', fontSize: '1rem',
+                  fontWeight: 800, color: 'var(--accent)',
+                }}>
+                  {totalDisponible} {recurso.unidadMedida}
+                </span>
+                <span style={{ fontSize: '.75rem', color: 'var(--muted)' }}>· RUT: {recurso.donanteRut || '—'}</span>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={submit}>
+            <Select
+              label="Centro de acopio destino *"
+              value={centroId}
+              onChange={setCentroId}
+              options={opcionCentros}
+              required
+            />
+
+            {/* Campo cantidad con indicador visual */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{
+                display: 'block', fontSize: '.78rem', color: 'var(--muted)',
+                marginBottom: 5, letterSpacing: '.05em', textTransform: 'uppercase',
+              }}>
+                Cantidad a distribuir * <span style={{ color: 'var(--accent)' }}>({recurso.unidadMedida})</span>
+              </label>
+
+              {/* Input con botones rápidos */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <input
+                  type="number"
+                  value={cantidad}
+                  onChange={e => setCantidad(e.target.value)}
+                  placeholder={`Máx. ${totalDisponible}`}
+                  min="0.01"
+                  max={totalDisponible}
+                  step="0.01"
+                  required
+                  style={{
+                    flex: 1, background: 'var(--bg)',
+                    border: `1px solid ${excede ? '#e8345a' : 'var(--border)'}`,
+                    borderRadius: 8, padding: '9px 12px', color: 'var(--text)',
+                    fontFamily: 'var(--font-body)', fontSize: '.9rem', outline: 'none',
+                  }}
+                  onFocus={e => e.target.style.borderColor = excede ? '#e8345a' : 'var(--accent)'}
+                  onBlur={e => e.target.style.borderColor = excede ? '#e8345a' : 'var(--border)'}
+                />
+                {/* Botones rápidos */}
+                {[25, 50, 75, 100].map(pctBtn => (
+                  <button
+                    key={pctBtn}
+                    type="button"
+                    onClick={() => setCantidad(String(Math.round((totalDisponible * pctBtn / 100) * 100) / 100))}
+                    style={{
+                      padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)',
+                      background: pct === pctBtn ? 'var(--accent)' : 'var(--bg)',
+                      color: pct === pctBtn ? '#fff' : 'var(--muted)',
+                      fontSize: '.75rem', fontWeight: 600, cursor: 'pointer',
+                      transition: 'all .15s', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {pctBtn}%
+                  </button>
+                ))}
+              </div>
+
+              {/* Barra de progreso */}
+              {cantidadNum > 0 && (
+                <div>
+                  <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
+                    <div style={{
+                      height: '100%', borderRadius: 3, transition: 'width .3s',
+                      width: `${Math.min(100, pct)}%`,
+                      background: excede ? '#e8345a' : pct > 75 ? '#ffa735' : '#48c78e',
+                    }} />
+                  </div>
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between',
+                    fontSize: '.72rem', color: excede ? '#e8345a' : 'var(--muted)',
+                  }}>
+                    <span>{excede ? `⚠️ Supera el máximo (${totalDisponible} ${recurso.unidadMedida})` : `${Math.round(pct)}% del total`}</span>
+                    <span>Restante: {Math.max(0, totalDisponible - cantidadNum).toLocaleString('es-CL')} {recurso.unidadMedida}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Confirmación visual */}
+            {cantidadNum > 0 && !excede && (
+              <div style={{
+                background: 'rgba(72,199,142,.08)', border: '1px solid rgba(72,199,142,.2)',
+                borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+                fontSize: '.85rem', color: '#48c78e', lineHeight: 1.6,
+              }}>
+                📦 Se agregarán <strong>{cantidadNum} {recurso.unidadMedida}</strong> de{' '}
+                <strong>{recurso.tipoRecurso}</strong> al inventario del centro seleccionado.
+              </div>
+            )}
+
+            {error && (
+              <div style={{
+                color: '#e8345a', fontSize: '.85rem', marginBottom: 12,
+                padding: '8px 12px', background: 'rgba(232,52,90,.08)', borderRadius: 8,
+              }}>{error}</div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+              <Btn disabled={loading || !centroId || cantidadNum <= 0 || excede}>
+                {loading ? 'Distribuyendo...' : '📦 Confirmar distribución'}
+              </Btn>
+            </div>
+          </form>
+        </>
+      )}
+    </Modal>
+  )
+}
+
+
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function GestionDonaciones() {
   const [activeTab, setActiveTab] = useState('recursos')   // 'recursos' | 'donantes'
@@ -330,10 +521,25 @@ export default function GestionDonaciones() {
     }},
     { key: 'centroAcopioId', label: 'Centro', render: r => r.centroAcopioId ? `Centro #${r.centroAcopioId}` : '—' },
     {
-      key: 'acciones', label: 'Acciones',
-      render: r => (
-        <Btn size="sm" variant="danger" onClick={() => eliminarRecurso(r.id)}>🗑 Eliminar</Btn>
-      ),
+    key: 'acciones', label: 'Acciones',
+    render: r => (
+        <div style={{ display: 'flex', gap: 6 }}>
+        <Btn
+            size="sm"
+            variant="success"
+            onClick={() => setModal({ tipo: 'distribuir', recurso: r })}
+        >
+            📦 Distribuir
+        </Btn>
+        <Btn
+            size="sm"
+            variant="danger"
+            onClick={() => eliminarRecurso(r.id)}
+        >
+            🗑
+        </Btn>
+        </div>
+    ),
     },
   ]
 
@@ -469,6 +675,14 @@ export default function GestionDonaciones() {
           donante={modal.donante}
           onClose={() => setModal(null)}
           onEliminado={() => { setModal(null); cargarDonantes() }}
+        />
+      )}
+      {modal?.tipo === 'distribuir' && (
+        <ModalDistribuir
+            recurso={modal.recurso}
+            centros={centros}
+            onClose={() => setModal(null)}
+            onDistribuido={() => cargarRecursos(page, rutQuery)}
         />
       )}
     </div>

@@ -144,52 +144,133 @@ function ModalInventario({ centro, onClose }) {
       .finally(() => setLoading(false))
   }, [centro.id])
 
-  const EMOJI = { ALIMENTOS: '🍚', ROPA: '👕', DINERO: '💰', INSUMOS_MEDICOS: '💊', INSUMOS_HIGIENE: '🧼', OTRO: '📦' }
+  const EMOJI = {
+    ALIMENTOS: '🍚', ROPA: '👕', DINERO: '💰',
+    INSUMOS_MEDICOS: '💊', INSUMOS_HIGIENE: '🧼', OTRO: '📦',
+  }
+
+  const totalKg = data?.inventario?.reduce((acc, i) => {
+    if (i.unidadMedida === 'kg') return acc + Number(i.cantidadDisponible)
+    return acc
+  }, 0) || 0
+
+  const pctCapacidad = data?.capacidadMaximaKg
+    ? Math.min(100, Math.round((totalKg / data.capacidadMaximaKg) * 100))
+    : 0
 
   return (
-    <Modal title={`Inventario — ${centro.nombre}`} onClose={onClose} width={480}>
+    <Modal title={`Inventario — ${centro.nombre}`} onClose={onClose} width={500}>
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 32, color: 'var(--muted)' }}>Cargando inventario...</div>
-      ) : !data?.inventario?.length ? (
         <div style={{ textAlign: 'center', padding: 32, color: 'var(--muted)' }}>
-          <div style={{ fontSize: '2rem', marginBottom: 8 }}>📭</div>
-          <div>Sin inventario registrado</div>
+          Cargando inventario...
         </div>
       ) : (
-        <div>
-          {data.inventario.map(item => {
-            const pct = Math.min(100, (item.cantidadDisponible / (data.capacidadMaximaKg || 1000)) * 100)
-            const color = item.cantidadDisponible === 0 ? '#e8345a' : item.cantidadDisponible < 20 ? '#ffa735' : '#48c78e'
-            return (
-              <div key={item.id} style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                padding: '14px 0', borderBottom: '1px solid var(--border)',
-              }}>
-                <div style={{
-                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                  background: `${color}15`, display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', fontSize: '1.2rem',
-                }}>
-                  {EMOJI[item.tipoRecurso] || '📦'}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ fontSize: '.875rem', fontWeight: 500 }}>{item.tipoRecurso}</span>
-                    <span style={{ fontFamily: 'var(--font-display)', fontSize: '.9rem', fontWeight: 700, color }}>
-                      {Number(item.cantidadDisponible).toLocaleString('es-CL')} {item.unidadMedida}
-                    </span>
-                  </div>
-                  <div style={{ height: 4, background: 'var(--surface2)', borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2, transition: 'width .5s' }} />
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-          <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--surface2)', borderRadius: 10, fontSize: '.82rem', color: 'var(--muted)' }}>
-            Capacidad máxima: <strong style={{ color: 'var(--text)' }}>{data.capacidadMaximaKg?.toLocaleString('es-CL') || '—'} kg</strong>
+        <>
+          {/* Cabecera del centro */}
+          <div style={{
+            background: 'var(--surface2)', borderRadius: 12,
+            padding: '14px 18px', marginBottom: 20,
+          }}>
+            <div style={{ fontSize: '.8rem', color: 'var(--muted)', marginBottom: 4 }}>
+              {data?.direccion} · {data?.comuna}, {data?.region}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>Capacidad usada (kg)</span>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: '.9rem', fontWeight: 700 }}>
+                {totalKg.toLocaleString('es-CL')} / {data?.capacidadMaximaKg?.toLocaleString('es-CL') || '—'} kg
+              </span>
+            </div>
+            {/* Barra de capacidad */}
+            <div style={{ height: 6, background: 'var(--bg)', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', borderRadius: 3, transition: 'width .5s',
+                width: `${pctCapacidad}%`,
+                background: pctCapacidad > 80 ? '#e8345a' : pctCapacidad > 50 ? '#ffa735' : '#48c78e',
+              }} />
+            </div>
+            <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: 4, textAlign: 'right' }}>
+              {pctCapacidad}% de capacidad
+            </div>
           </div>
-        </div>
+
+          {/* Items de inventario */}
+          {!data?.inventario?.length ? (
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--muted)' }}>
+              <div style={{ fontSize: '2rem', marginBottom: 8 }}>📭</div>
+              <div style={{ fontWeight: 500, marginBottom: 4 }}>Sin inventario</div>
+              <div style={{ fontSize: '.82rem' }}>Distribuye donaciones a este centro para ver el stock</div>
+            </div>
+          ) : (
+            <div>
+              <div style={{
+                fontSize: '.75rem', color: 'var(--muted)', letterSpacing: '.08em',
+                textTransform: 'uppercase', marginBottom: 10,
+              }}>
+                Stock actual
+              </div>
+              {data.inventario.map(item => {
+                const pct = data.capacidadMaximaKg && item.unidadMedida === 'kg'
+                  ? Math.min(100, (item.cantidadDisponible / data.capacidadMaximaKg) * 100)
+                  : 0
+                const color = item.cantidadDisponible === 0 ? '#e8345a'
+                  : item.cantidadDisponible < 20 ? '#ffa735' : '#48c78e'
+
+                return (
+                  <div key={item.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    padding: '14px 0', borderBottom: '1px solid var(--border)',
+                  }}>
+                    <div style={{
+                      width: 42, height: 42, borderRadius: 10, flexShrink: 0,
+                      background: `${color}15`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '1.2rem',
+                    }}>
+                      {EMOJI[item.tipoRecurso] || '📦'}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ fontSize: '.875rem', fontWeight: 500 }}>{item.tipoRecurso}</span>
+                        <span style={{
+                          fontFamily: 'var(--font-display)', fontSize: '.95rem',
+                          fontWeight: 700, color,
+                        }}>
+                          {Number(item.cantidadDisponible).toLocaleString('es-CL')} {item.unidadMedida}
+                        </span>
+                      </div>
+                      {item.unidadMedida === 'kg' && (
+                        <div style={{ height: 4, background: 'var(--surface2)', borderRadius: 2, overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%', width: `${pct}%`, background: color,
+                            borderRadius: 2, transition: 'width .5s',
+                          }} />
+                        </div>
+                      )}
+                      {item.ultimaActualizacion && (
+                        <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 4 }}>
+                          Última actualización: {new Date(item.ultimaActualizacion).toLocaleDateString('es-CL', {
+                            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Capacidad total */}
+          <div style={{
+            marginTop: 16, padding: '12px 16px',
+            background: 'var(--surface2)', borderRadius: 10,
+            display: 'flex', justifyContent: 'space-between',
+            fontSize: '.82rem', color: 'var(--muted)',
+          }}>
+            <span>Encargado:</span>
+            <strong style={{ color: 'var(--text)' }}>{data?.nombreEncargado || '—'}</strong>
+          </div>
+        </>
       )}
       <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
         <Btn variant="ghost" onClick={onClose}>Cerrar</Btn>
